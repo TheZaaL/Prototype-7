@@ -1,10 +1,13 @@
 const int trigPin = 2;
 const int ledPin = 3;
 const int echoPin = 4;
-const int distance = 20;
+const int distance = 40;
+const int valcompteurmax = 3;
+
+int saut_appel = 0;
+int compteur = 0;
 
 void setup() {
-  // initialize serial communication:
   Serial.begin(9600);
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -13,53 +16,47 @@ void setup() {
 
 void loop()
 {
-  // establish variables for duration of the ping, 
-  // and the distance result in inches and centimeters:
-  long duration, inches, cm;
+  long duration, cm;
 
-  // The sensor is triggered by a HIGH pulse of 10 or more microseconds.
-  // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
-  pinMode(ledPin, OUTPUT);
+  // Determine hand distance
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
-
-  // Read the signal from the sensor: a HIGH pulse whose
-  // duration is the time (in microseconds) from the sending
-  // of the ping to the reception of its echo off of an object.
-  pinMode(echoPin, INPUT);
+  
   duration = pulseIn(echoPin, HIGH);
-
-  // convert the time into a distance
-  inches = microsecondsToInches(duration);
+  
+  
   cm = microsecondsToCentimeters(duration);
   
-  Serial.print(inches);
-  Serial.print("in, ");
   Serial.print(cm);
-  Serial.print("cm");
-  Serial.println();
-
-if (cm <= distance) {
-    digitalWrite(ledPin, LOW);
-  delay(100);
-}
-if (cm > distance) {
+  Serial.println("cm ");
+  
+  // If hand not in range, reset counter
+  if (cm > distance) {
     digitalWrite(ledPin, HIGH);
-  delay(100);
-}
+    compteur = 0;
+    Serial.println(compteur);
+    delay(100);
+  }
+  
+  // If hand in range, increase counter if it has not attained the max value
+  else if (compteur < valcompteurmax) {
+    compteur++;
+    Serial.println(compteur);
+    delay(100);
+  }
 
-}
-long microsecondsToInches(long microseconds)
-{
-  // According to Parallax's datasheet for the PING))), there are
-  // 73.746 microseconds per inch (i.e. sound travels at 1130 feet per
-  // second).  This gives the distance travelled by the ping, outbound
-  // and return, so we divide by 2 to get the distance of the obstacle.
-  // See: http://www.parallax.com/dl/docs/prod/acc/28015-PING-v1.3.pdf
-  return microseconds / 74 / 2;
+  // At this point, we have the max counter value: user has reached
+  // the target and we wait for user to get back to center
+  else {
+    digitalWrite(ledPin, LOW);
+    saut_appel = 1;
+    Serial.println(saut_appel);
+    delay(5000);
+    saut_appel = 0;
+  }
 }
 
 long microsecondsToCentimeters(long microseconds)
