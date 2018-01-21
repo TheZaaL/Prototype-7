@@ -1,33 +1,72 @@
-const int trigPin = 2;
-const int ledPin = 3;
-const int echoPin = 4;
-const int distance = 40;
+const int TARGET_COUNT = 2;
+
+const int trigPins[TARGET_COUNT] = {2, 3};
+const int ledPins[TARGET_COUNT] = {4, 5};
+const int echoPins[TARGET_COUNT] = {6, 7};
+
+const int distance = 20;
 const int valcompteurmax = 3;
 
-int saut_appel = 0;
+int currentTarget = -1;
 int compteur = 0;
+
+unsigned long nextTargetTime = 0;
+const unsigned long nextTargetCooldown = 3000;
 
 void setup() {
   Serial.begin(9600);
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-  pinMode(ledPin, OUTPUT);
+
+  // Initialize pins
+  for(int i = 0; i < TARGET_COUNT; i++) {
+    pinMode(trigPins[i], OUTPUT);
+    pinMode(echoPins[i], INPUT);
+    pinMode(ledPins[i], OUTPUT);
+
+    digitalWrite(trigPins[i], LOW);
+    digitalWrite(ledPins[i], LOW);
+  }
 }
 
 void loop()
 {
+  // If no target is turned on, check if we need to turn one on
+  if(currentTarget < 0) {
+    trySetNextTarget();
+  }
+
+  else if(isCurrentTargetReached())
+  {
+    // Turn led off and wait for user to return to center position
+    digitalWrite(ledPins[currentTarget], LOW);
+    currentTarget = -1;
+    nextTargetTime = millis() + nextTargetCooldown;
+    
+    Serial.println("Target reached");
+  }
+
+  delay(100);
+}
+
+void trySetNextTarget(){
+  if (millis() > nextTargetTime) {
+    // Turn on next target
+    currentTarget = random(0, TARGET_COUNT);
+    digitalWrite(ledPins[currentTarget], HIGH);
+  }
+}
+
+bool isCurrentTargetReached(){
+  
   long duration, cm;
 
-  // Determine hand distance
-  digitalWrite(trigPin, LOW);
+  // Measure hand distance
+  digitalWrite(trigPins[currentTarget], LOW);
   delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
+  digitalWrite(trigPins[currentTarget], HIGH);
   delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
+  digitalWrite(trigPins[currentTarget], LOW);
   
-  duration = pulseIn(echoPin, HIGH);
-  
-  
+  duration = pulseIn(echoPins[currentTarget], HIGH);
   cm = microsecondsToCentimeters(duration);
   
   Serial.print(cm);
@@ -35,27 +74,24 @@ void loop()
   
   // If hand not in range, reset counter
   if (cm > distance) {
-    digitalWrite(ledPin, HIGH);
     compteur = 0;
     Serial.println(compteur);
-    delay(100);
+
+    return false;
   }
   
   // If hand in range, increase counter if it has not attained the max value
   else if (compteur < valcompteurmax) {
     compteur++;
     Serial.println(compteur);
-    delay(100);
+
+    return false;
   }
 
   // At this point, we have the max counter value: user has reached
   // the target and we wait for user to get back to center
   else {
-    digitalWrite(ledPin, LOW);
-    saut_appel = 1;
-    Serial.println(saut_appel);
-    delay(5000);
-    saut_appel = 0;
+    return true;
   }
 }
 
