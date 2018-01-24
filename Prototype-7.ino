@@ -8,7 +8,7 @@ const int irReceiverPins[TARGET_COUNT] = {A1, A2};
 const int ledPins[TARGET_COUNT] = {4, 7};
 const int led2Pins[TARGET_COUNT] = {5, 8};
 
-const int originIrLed = 2
+const int originIrLed = 2;
 const int originIrReceiver = A0;
 
 // Calibration of the receivers, default value of 0
@@ -29,20 +29,7 @@ void setup() {
   Serial.begin(9600);
 
   // Initialize pins
-  for(int i = 0; i < TARGET_COUNT; i++) {
-    pinMode(irReceiverPins[i], INPUT);
-    pinMode(ledPins[i], OUTPUT);
-    pinMode(led2Pins[i], OUTPUT);
-
-    digitalWrite(ledPins[i], LOW);
-    digitalWrite(led2Pins[i], LOW);
-  }
-
-  // Initialize origin pins
-  pinMode(originIrReceiver, INPUT);
-  pinMode(originIrLed, OUTPUT);
-
-  digitalWrite(originIrLed, LOW);
+  initPins();
 
   // Getting ready
   setGameParameters();
@@ -57,18 +44,39 @@ void setup() {
 
 void loop()
 {
-  // If no target is turned on, check if we need to turn one on
   if(isTargetOn && isTargetReached()) {
+    // Turn origin pins off and turn a random target on
     setTargetReached();
   }
 
-  else if(!isTargetOn && isOriginReached()){
+  // else if(!isTargetOn && isOriginReached()){
+  else if(!isTargetOn && isOriginReachedSTUB()){
+    // Turn target off and turn origin sensors on
     setNextTarget();
   }
 
   if(targetReachedCount >= AMOUNT_TO_REACH){
+    // End the game and display results
     triggerEndGame();
   }
+}
+
+void initPins(){
+  // Initialize target pins
+  for(int i = 0; i < TARGET_COUNT; i++) {
+    pinMode(irReceiverPins[i], INPUT);
+    pinMode(ledPins[i], OUTPUT);
+    pinMode(led2Pins[i], OUTPUT);
+
+    digitalWrite(ledPins[i], LOW);
+    digitalWrite(led2Pins[i], LOW);
+  }
+
+  // Initialize origin pins
+  pinMode(originIrReceiver, INPUT);
+  pinMode(originIrLed, OUTPUT);
+
+  digitalWrite(originIrLed, LOW);
 }
 
 void setGameParameters(){
@@ -105,9 +113,14 @@ void playReadyAnimation(){
   // TODO
 }
 
+bool isOriginReachedSTUB(){
+  delay(500);
+  return true;
+}
+
 bool isOriginReached(){
   // Read the receiver value
-  receiverValue = analogRead(originIrReceiver);
+  int receiverValue = analogRead(originIrReceiver);
 
   // Ajust value with calibration
   receiverValue = receiverValue - baseOriginReceiverValue;
@@ -118,7 +131,7 @@ bool isOriginReached(){
 
 bool isTargetReached(){
   // Read the receiver value
-  receiverValue = analogRead(irReceiverPins[currentTarget]);
+  int receiverValue = analogRead(irReceiverPins[currentTarget]);
 
   // Ajust value with calibration
   receiverValue = receiverValue - baseReceiverValues[currentTarget];
