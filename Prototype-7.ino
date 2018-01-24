@@ -1,7 +1,7 @@
 const int TARGET_COUNT = 2;
-const int CALIBRATION_COOLDOWN = 300;
+const int CALIBRATION_COOLDOWN = 500;
 const int AMOUNT_TO_REACH = 20;
-const int RECEIVER_REACHED_THRESHOLD = 200;
+const int RECEIVER_REACHED_THRESHOLD = 80;
 const int ORIGIN_REACHED_THRESHOLD = 200;
 
 const int irReceiverPins[TARGET_COUNT] = {A1, A2};
@@ -103,6 +103,7 @@ void calibrateSensors(){
 
     // Read base value and turn off LEDS
     baseReceiverValues[i] = analogRead(irReceiverPins[i]);
+    Serial.println(baseReceiverValues[i]);
     digitalWrite(ledPins[i], LOW);
     digitalWrite(led2Pins[i], LOW);
   }
@@ -111,10 +112,11 @@ void calibrateSensors(){
 void playReadyAnimation(){
   // Have fun! (something like 3-2-1-GO)
   // TODO
+  delay(500);
 }
 
 bool isOriginReachedSTUB(){
-  delay(500);
+  delay(1000);
   return true;
 }
 
@@ -135,6 +137,8 @@ bool isTargetReached(){
 
   // Ajust value with calibration
   receiverValue = receiverValue - baseReceiverValues[currentTarget];
+ 
+  Serial.println(receiverValue);
 
   // If the calibrated value is higher than the treshold, player has reached the target
   return (receiverValue > RECEIVER_REACHED_THRESHOLD);
@@ -179,5 +183,8 @@ void setTargetReached(){
 void triggerEndGame(){
   // Stop everything, show stats, etc.
   // TODO
+
+  delay(2000);
+  targetReachedCount = 0;
 }
 
