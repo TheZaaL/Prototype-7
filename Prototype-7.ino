@@ -1,14 +1,26 @@
 const int TARGET_COUNT = 2;
+const int CALIBRATION_COOLDOWN = 300;
+const int AMOUNT_TO_REACH = 20;
+const int RECEIVER_REACHED_THRESHOLD = 200;
+const int ORIGIN_REACHED_THRESHOLD = 200;
 
-const int trigPins[TARGET_COUNT] = {2, 3};
-const int ledPins[TARGET_COUNT] = {4, 5};
-const int echoPins[TARGET_COUNT] = {6, 7};
+const int irReceiverPins[TARGET_COUNT] = {A1, A2};
+const int ledPins[TARGET_COUNT] = {4, 7};
+const int led2Pins[TARGET_COUNT] = {5, 8};
 
-const int distance = 20;
-const int valcompteurmax = 3;
+const int originIrLed = 2
+const int originIrReceiver = A0;
 
-int currentTarget = -1;
-int compteur = 0;
+// Calibration of the receivers, default value of 0
+int baseReceiverValues[TARGET_COUNT] = {};
+int baseOriginReceiverValue = 0;
+
+int targetReachedCount = 0;
+int currentTarget = 0;
+bool isTargetOn = false;
+
+unsigned long atOriginTimes[AMOUNT_TO_REACH] = {};
+unsigned long atTargetTimes[AMOUNT_TO_REACH] = {};
 
 unsigned long nextTargetTime = 0;
 const unsigned long nextTargetCooldown = 3000;
@@ -18,87 +30,141 @@ void setup() {
 
   // Initialize pins
   for(int i = 0; i < TARGET_COUNT; i++) {
-    pinMode(trigPins[i], OUTPUT);
-    pinMode(echoPins[i], INPUT);
+    pinMode(irReceiverPins[i], INPUT);
     pinMode(ledPins[i], OUTPUT);
+    pinMode(led2Pins[i], OUTPUT);
 
-    digitalWrite(trigPins[i], LOW);
     digitalWrite(ledPins[i], LOW);
+    digitalWrite(led2Pins[i], LOW);
   }
+
+  // Initialize origin pins
+  pinMode(originIrReceiver, INPUT);
+  pinMode(originIrLed, OUTPUT);
+
+  digitalWrite(originIrLed, LOW);
+
+  // Getting ready
+  setGameParameters();
+  
+  calibrateSensors();
+
+  playReadyAnimation();
+
+  // Start game
+  setNextTarget();
 }
 
 void loop()
 {
   // If no target is turned on, check if we need to turn one on
-  if(currentTarget < 0) {
-    trySetNextTarget();
+  if(isTargetOn && isTargetReached()) {
+    setTargetReached();
   }
 
-  else if(isCurrentTargetReached())
-  {
-    // Turn led off and wait for user to return to center position
-    digitalWrite(ledPins[currentTarget], LOW);
-    currentTarget = -1;
-    nextTargetTime = millis() + nextTargetCooldown;
-    
-    Serial.println("Target reached");
+  else if(!isTargetOn && isOriginReached()){
+    setNextTarget();
   }
 
-  delay(100);
-}
-
-void trySetNextTarget(){
-  if (millis() > nextTargetTime) {
-    // Turn on next target
-    currentTarget = random(0, TARGET_COUNT);
-    digitalWrite(ledPins[currentTarget], HIGH);
+  if(targetReachedCount >= AMOUNT_TO_REACH){
+    triggerEndGame();
   }
 }
 
-bool isCurrentTargetReached(){
-  
-  long duration, cm;
+void setGameParameters(){
+  // Set number of targets to reach, or time limit, etc.
+  // TODO
+}
 
-  // Measure hand distance
-  digitalWrite(trigPins[currentTarget], LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPins[currentTarget], HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPins[currentTarget], LOW);
-  
-  duration = pulseIn(echoPins[currentTarget], HIGH);
-  cm = microsecondsToCentimeters(duration);
-  
-  Serial.print(cm);
-  Serial.println("cm ");
-  
-  // If hand not in range, reset counter
-  if (cm > distance) {
-    compteur = 0;
-    Serial.println(compteur);
+void calibrateSensors(){
+  // Calibrate origin receiver
+  // Turn on LEDS
+  digitalWrite(originIrLed, HIGH);
+  delay(CALIBRATION_COOLDOWN);
 
-    return false;
-  }
-  
-  // If hand in range, increase counter if it has not attained the max value
-  else if (compteur < valcompteurmax) {
-    compteur++;
-    Serial.println(compteur);
+  // Read base value and turn off LEDS
+  baseOriginReceiverValue = analogRead(originIrReceiver);
+  digitalWrite(originIrLed, LOW);
 
-    return false;
-  }
+  // Calibrate targets
+  for(int i = 0; i < TARGET_COUNT; i++) {
+    // Turn on LEDS
+    digitalWrite(ledPins[i], HIGH);
+    digitalWrite(led2Pins[i], HIGH);
+    delay(CALIBRATION_COOLDOWN);
 
-  // At this point, we have the max counter value: user has reached
-  // the target and we wait for user to get back to center
-  else {
-    return true;
+    // Read base value and turn off LEDS
+    baseReceiverValues[i] = analogRead(irReceiverPins[i]);
+    digitalWrite(ledPins[i], LOW);
+    digitalWrite(led2Pins[i], LOW);
   }
 }
 
-long microsecondsToCentimeters(long microseconds)
-{
-  // The speed of sound is 340 m/s or 29 microseconds per centimeter.
-  // The ping travels out and back, so to find the distance of the
-  // object we take half of the distance travelled.
-  return microseconds / 29 / 2;
+void playReadyAnimation(){
+  // Have fun! (something like 3-2-1-GO)
+  // TODO
 }
+
+bool isOriginReached(){
+  // Read the receiver value
+  receiverValue = analogRead(originIrReceiver);
+
+  // Ajust value with calibration
+  receiverValue = receiverValue - baseOriginReceiverValue;
+
+  // If the calibrated value is lower than the treshold, player has reached the origin
+  return (receiverValue < ORIGIN_REACHED_THRESHOLD);
+}
+
+bool isTargetReached(){
+  // Read the receiver value
+  receiverValue = analogRead(irReceiverPins[currentTarget]);
+
+  // Ajust value with calibration
+  receiverValue = receiverValue - baseReceiverValues[currentTarget];
+
+  // If the calibrated value is higher than the treshold, player has reached the target
+  return (receiverValue > RECEIVER_REACHED_THRESHOLD);
+}
+
+void setNextTarget(){
+  // Save current time
+  atOriginTimes[targetReachedCount] = millis();
+
+  // Turn off origin LED
+  digitalWrite(originIrLed, LOW);
+
+  // Choose next target
+  currentTarget = random(0, TARGET_COUNT);
+
+  // Turn on target LEDS
+  digitalWrite(ledPins[currentTarget], HIGH);
+  digitalWrite(led2Pins[currentTarget], HIGH);
+
+  // Target is on!
+  isTargetOn = true;
+}
+
+void setTargetReached(){
+  // Save current time
+  atTargetTimes[targetReachedCount] = millis();
+
+  // Turn off target LEDS
+  digitalWrite(ledPins[currentTarget], LOW);
+  digitalWrite(led2Pins[currentTarget], LOW);
+
+  // Turn on origin LED
+  digitalWrite(originIrLed, HIGH);
+
+  // Increment target reached count
+  targetReachedCount++;
+
+  // Target is off!
+  isTargetOn = false;
+}
+
+void triggerEndGame(){
+  // Stop everything, show stats, etc.
+  // TODO
+}
+
